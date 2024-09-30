@@ -1,0 +1,17 @@
+{
+  "name": "fullstack",
+  "version": "1.0.0",
+  "description": "a fullstack youtube clone",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "fullstack",
+    "mern",
+    "youtube",
+    "clone"
+  ],
+  "author": "hemant yadav",
+  "license": "ISC"
+}
