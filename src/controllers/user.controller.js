@@ -20,7 +20,7 @@ const generateAccessAndRefreshTokens = async (user) => {
   }
 }
 
-
+// Handle user registration
 const registerUser = asyncHandler(async (req, res) => {
 
   const { username, email, fullName, password } = req.body;
@@ -137,8 +137,28 @@ const loginUser = asyncHandler(async (req, res) => {
 
 })
 
+// Handle user logout
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { refreshToken: undefined } },
+    { new: true }
+  )
+
+  const options = {
+    httpOnly: true,
+    secure: true
+  }
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(204, {}, "User logged out"))
+})
 
 export {
   registerUser,
   loginUser,
+  logoutUser
 }
