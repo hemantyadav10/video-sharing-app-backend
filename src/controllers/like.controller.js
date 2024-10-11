@@ -9,145 +9,126 @@ import { Tweet } from '../models/tweet.model.js'
 
 // Toggle the like status of a video (like if not liked, unlike if already liked)
 const toggleVideoLike = asyncHandler(async (req, res) => {
-  const { videoId } = req.params
+  const { videoId } = req.params;
 
-  if (!videoId) {
-    throw new ApiError(400, "Video id is missing")
-  }
-
-  if (!(isValidObjectId(videoId))) {
-    throw new ApiError(400, 'Invalid id')
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, 'Invalid id');
   }
 
   // Check if the user has already liked the video
-  const hasLiked = await Like.findOne({
+  const like = await Like.findOneAndDelete({
     likedBy: req.user?._id,
     video: videoId
-  })
+  });
 
-  // If the user has not liked the video yet
-  if (!hasLiked) {
-    const video = await Video.findById(videoId)
-
-    if (!video) {
-      throw new ApiError(404, "Video not found")
-    }
-
-    // Create a new like entry for the video
-    const like = await Like.create({
-      video: videoId,
-      likedBy: req.user?._id
-    })
-
-    if (!like) {
-      throw new ApiError(500, "Failed to like video")
-    }
-
+  // If a like was found and deleted, respond with unliked
+  if (like) {
     return res
       .status(200)
-      .json(new ApiResponse(200, like, "Video liked successfully"))
+      .json(new ApiResponse(200, {}, "Video unliked successfully"));
   }
 
-  // If the user has already liked the video, unlike it
-  await Like.findByIdAndDelete(hasLiked?._id)
+  // Check if the video exists 
+  const video = await Video.findById(videoId).select("_id");
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // If no like was found, create a new one
+  const newLike = await Like.create({
+    video: videoId,
+    likedBy: req.user?._id
+  });
+
+  if (!newLike) {
+    throw new ApiError(500, "Failed to like video");
+  }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Video unliked successfully"))
-})
+    .json(new ApiResponse(200, newLike, "Video liked successfully"));
+});
 
 // Toogle like status of a comment
 const toggleCommentLike = asyncHandler(async (req, res) => {
   const { commentId } = req.params
 
-  if (!commentId) {
-    throw new ApiError(400, "Comment id is missing")
-  }
-
   if (!(isValidObjectId(commentId))) {
     throw new ApiError(400, 'Invalid id')
   }
 
-  // Check if the user has already liked the comment
-  const hasLiked = await Like.findOne({
+  const like = await Like.findOneAndDelete({
     likedBy: req.user?._id,
     comment: commentId
-  })
+  });
 
-  // If the user has not liked the comment yet
-  if (!hasLiked) {
-    const comment = await Comment.findById(commentId)
-
-    if (!comment) {
-      throw new ApiError(404, "Comment not found")
-    }
-
-    // Create a new like entry for the comment
-    const like = await Like.create({
-      comment: commentId,
-      likedBy: req.user?._id
-    })
-
-    if (!like) {
-      throw new ApiError(500, "Failed to like comment")
-    }
-
+  // If a like was found and deleted, respond with unliked
+  if (like) {
     return res
       .status(200)
-      .json(new ApiResponse(200, like, "Comment liked successfully"))
+      .json(new ApiResponse(200, {}, "Comment unliked successfully"));
   }
 
-  // If the user has already liked the comment, unlike it
-  await Like.findByIdAndDelete(hasLiked?._id)
+  // Check if the comment exists 
+  const comment = await Comment.findById(commentId).select("_id");
+  if (!comment) {
+    throw new ApiError(404, "Comment not found");
+  }
+
+  // If no like was found, create a new one
+  const newLike = await Like.create({
+    comment: commentId,
+    likedBy: req.user?._id
+  });
+
+  if (!newLike) {
+    throw new ApiError(500, "Failed to like comment");
+  }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Comment unliked successfully"))
+    .json(new ApiResponse(200, newLike, "Comment liked successfully"));
 })
 
 // Toogle like status of a tweet
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const { tweetId } = req.params
 
-  if (!tweetId?.trim()) {
-    throw new ApiError(400, "Tweet id is missing")
-  }
-
   if (!(isValidObjectId(tweetId))) {
     throw new ApiError(400, 'Invalid id')
   }
 
-  const hasLiked = await Like.findOne({
+  const like = await Like.findOneAndDelete({
     likedBy: req.user?._id,
     tweet: tweetId
-  })
+  });
 
-  if (!hasLiked) {
-    const tweet = await Tweet.findById(tweetId)
-
-    if (!tweet) {
-      throw new ApiError(404, "Tweet not found")
-    }
-
-    const like = await Like.create({
-      tweet: tweetId,
-      likedBy: req.user?._id
-    })
-
-    if (!like) {
-      throw new ApiError(500, "Failed to like the tweet")
-    }
-
+  // If a like was found and deleted, respond with unliked
+  if (like) {
     return res
       .status(200)
-      .json(new ApiResponse(200, like, "Tweet liked successfully"))
+      .json(new ApiResponse(200, {}, "Tweet unliked successfully"));
   }
 
-  await Like.findByIdAndDelete(hasLiked?._id)
+  // Check if the video exists 
+  const tweet = await Tweet.findById(tweetId).select("_id");
+  if (!tweet) {
+    throw new ApiError(404, "Tweet not found");
+  }
+
+  // If no like was found, create a new one
+  const newLike = await Like.create({
+    tweet: tweetId,
+    likedBy: req.user?._id
+  });
+
+  if (!newLike) {
+    throw new ApiError(500, "Failed to like tweet");
+  }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Tweet unliked successfully"))
+    .json(new ApiResponse(200, newLike, "Tweet liked successfully"));
 }
 )
 
