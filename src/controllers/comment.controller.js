@@ -5,27 +5,27 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import mongoose, { isValidObjectId } from 'mongoose'
 import { Video } from '../models/video.model.js';
 
+
+// Add a comment to a video
 const addComment = asyncHandler(async (req, res) => {
   const { content } = req.body
-
-  if (!content?.trim()) {
-    throw new ApiError(400, "Content is required");
-  }
-
   const { videoId } = req.params
 
-  if (!videoId) {
-    throw new ApiError(400, "Video id is missing")
+  // check if content is there and videoId is a valid id
+  if (!content?.trim()) {
+    throw new ApiError(400, "Content is required");
   }
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid video id")
   }
 
-  const video = await Video.findById(videoId);
+  //check for video existence
+  const video = await Video.findById(videoId).select("_id");
   if (!video) {
     throw new ApiError(404, "Video does not exist");
   }
 
+  //create comment if video exists
   const comment = await Comment.create({
     content: content.trim(),
     video: videoId,
@@ -41,6 +41,7 @@ const addComment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, comment, 'Comment added successfully'))
 })
 
+// Update a comment
 const updateComment = asyncHandler(async (req, res) => {
   const { newComment } = req.body
   const { commentId } = req.params
@@ -49,63 +50,44 @@ const updateComment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Content is required")
   }
 
-  if (!commentId) {
-    throw new ApiError(400, "comment id is required")
-  }
-
   if (!isValidObjectId(commentId)) {
     throw new ApiError(400, "Invalid comment id")
   }
 
-  const comment = await Comment.findById(commentId)
-
-  if (!comment) {
-    throw new ApiError(404, 'Comment not found')
-  }
-
-  if (!(comment.owner.equals(req.user?._id))) {
-    throw new ApiError(403, "You are not authorized to update comment")
-  }
-
-  comment.content = newComment.trim();
-
-  const updatedComment = await comment.save({ validateBeforeSave: false })
-
+  const updatedComment = await Comment.findOneAndUpdate(
+    {
+      _id: commentId,
+      owner: req.user._id
+    },
+    { content: newComment.trim() },
+    { new: true, validateBeforeSave: false }
+  )
 
   if (!updatedComment) {
-    throw new ApiError(500, "Failed to update comment")
+    throw new ApiError(500, "You are not authorized to update this comment or the comment does not exist")
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, comment, 'Comment updated successfully'))
+    .json(new ApiResponse(200, updatedComment, 'Comment updated successfully'))
 
 })
 
+// Delete a comment by its ID
 const deleteComment = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
-  if (!commentId) {
-    throw new ApiError(400, "comment id is missing")
-  }
 
   if (!isValidObjectId(commentId)) {
     throw new ApiError(400, "Invalid comment id")
   }
 
-  const comment = await Comment.findById(commentId)
+  const deletedComment = await Comment.findOneAndDelete({
+    _id: commentId,
+    owner: req.user._id,
+  });
 
-  if (!comment) {
-    throw new ApiError(404, "Comment not found")
-  }
-
-  if (!comment.owner.equals(req.user?._id)) {
-    throw new ApiError(403, "You are not authorized to delete this comment")
-  }
-
-  const deletedResult = await comment.deleteOne()
-
-  if (deletedResult.deletedCount !== 1) {
-    throw new ApiError(500, "Failed to delete the comment")
+  if (!deletedComment) {
+    throw new ApiError(404, 'Comment not found or unauthorized');
   }
 
   return res
@@ -113,6 +95,7 @@ const deleteComment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Comment Deleted successfully"))
 })
 
+// Fetch all comments for a video with pagination and sorting
 const getVideoComments = asyncHandler(async (req, res) => {
   const { videoId } = req.params
   const { page = 1, limit = 10, sortBy = 'newest' } = req.query
@@ -186,10 +169,6 @@ const getVideoComments = asyncHandler(async (req, res) => {
     page: Number(page),
     sort: { "createdAt": sortBy === 'newest' ? -1 : 1 }
   })
-
-  if (limitedComments.totalDocs === 0) {
-    throw new ApiError(404, "No comments found")
-  }
 
   return res
     .status(200)
