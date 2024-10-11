@@ -17,10 +17,6 @@ const createTweet = asyncHandler(async (req, res) => {
     owner: req.user?._id
   })
 
-  if (!tweet) {
-    throw new ApiError(500, 'Failed to create a tweet')
-  }
-
   return res
     .status(200)
     .json(new ApiResponse(200, tweet, "Tweet created successfully"))
@@ -32,10 +28,6 @@ const updateTweet = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
   const { content } = req.body
 
-  if (!tweetId) {
-    throw new ApiError(400, "tweet id is missing")
-  }
-
   if (!content?.trim()) {
     throw new ApiError(400, "content is required")
   }
@@ -44,22 +36,17 @@ const updateTweet = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid tweet id')
   }
 
-  const tweet = await Tweet.findById(tweetId)
-
-  if (!tweet) {
-    throw new ApiError(400, "No Tweet found")
-  }
-
-  if (!(tweet.owner.equals(req.user?._id))) {
-    throw new ApiError(403, 'You are not authorized to update this tweet')
-  }
-
-  tweet.content = content;
-
-  const updatedTweet = await tweet.save();
+  const updatedTweet = await Tweet.findOneAndUpdate(
+    {
+      _id: tweetId,
+      owner: req.user?._id
+    },
+    { content: content },
+    { new: true }
+  )
 
   if (!updatedTweet) {
-    throw new ApiError(500, 'Failed to update tweet')
+    throw new ApiError(404, "Tweet not found or you don't have permission to update it");
   }
 
   return res
@@ -72,28 +59,17 @@ const updateTweet = asyncHandler(async (req, res) => {
 const deleteTweet = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
 
-  if (!tweetId) {
-    throw new ApiError(400, "tweet id is missing")
-  }
-
   if ((!isValidObjectId(tweetId))) {
     throw new ApiError(400, 'Invalid tweet id')
   }
 
-  const tweet = await Tweet.findById(tweetId)
+  const deletedTweet = await Tweet.findOneAndDelete({
+    _id: tweetId,
+    owner: req.user?._id
+  })
 
-  if (!tweet) {
-    throw new ApiError(400, "No Tweet found")
-  }
-
-  if (!(tweet.owner.equals(req.user?._id))) {
-    throw new ApiError(403, 'You are not authorized to delete this tweet')
-  }
-
-  const deletedTweet = await tweet.deleteOne()
-
-  if (deletedTweet.deletedCount !== 1) {
-    throw new ApiError(500, "Failed to delete the tweet")
+  if (!deletedTweet) {
+    throw new ApiError(404, 'No tweet found or you are not authorized to delete this tweet')
   }
 
   return res
@@ -137,17 +113,52 @@ const getUserTweets = asyncHandler(async (req, res) => {
       }
     },
     {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "tweet",
+        as: "likes",
+        pipeline: [
+          {
+            $project: {
+              likedBy: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
       $addFields: {
+        likesCount: {
+          $size: "$likes",
+        },
         owner: {
-          $first: "$owner"
+          $first: "$owner",
+        },
+        isLiked: {
+          $cond: {
+            if: { $in: [req.user?._id, "$likes.likedBy"] },
+            then: true,
+            else: false
+          }
         }
-      }
+      },
     },
     {
       $sort: {
-        updatedAt: -1
+        createdAt: -1
       }
-    }
+    },
+    {
+      $project: {
+        content: 1,
+        owner: 1,
+        likesCount: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        isLiked: 1
+      },
+    },
   ]);
 
   return res
