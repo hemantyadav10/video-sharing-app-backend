@@ -93,7 +93,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
 
   if (!username && !email) {
-    throw new ApiError(400, "username or email is required");
+    throw new ApiError(400, "Either username or email is required");
   }
 
   if (!password) {
@@ -105,7 +105,7 @@ const loginUser = asyncHandler(async (req, res) => {
   })
 
   if (!user) {
-    throw new ApiError(404, "username or email doesnot exist")
+    throw new ApiError(404, "User not found with the provided username or email")
   }
 
   const isPasswordValid = await user.isPasswordCorrect(password);
@@ -120,7 +120,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: true
+    secure: true,
+    sameSite: 'Strict'
   }
 
   return res
@@ -131,8 +132,6 @@ const loginUser = asyncHandler(async (req, res) => {
       200,
       {
         user: loggedInUser,
-        accessToken,
-        refreshToken
       },
       "User logged in successfully"
     ))
@@ -144,12 +143,13 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     { $unset: { refreshToken: 1 } },
-    { new: true }
   )
 
   const options = {
     httpOnly: true,
-    secure: true
+    secure: true,
+    expires: new Date(0),
+    path: "/"
   }
 
   return res
@@ -205,7 +205,20 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
+
+  if (!oldPassword?.trim()) {
+    throw new ApiError(400, "Old password is required")
+  }
+
+  if (!newPassword?.trim()) {
+    throw new ApiError(400, "Old password is required")
+  }
+
   const user = await User.findById(req.user?._id)
+
+  if (!user) {
+    throw new ApiError(404, "User not found")
+  }
 
   const isCorrectPassword = await user.isPasswordCorrect(oldPassword)
 
@@ -398,7 +411,12 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: req.user._id
+        _id: new mongoose.Types.ObjectId(req.user._id)
+      }
+    },
+    {
+      $project: {
+        watchHistory: 1
       }
     },
     {
@@ -410,17 +428,19 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         pipeline: ([
           {
             $lookup: {
-              from: 'users',
-              localField: 'owner',
+              from: "users",
               foreignField: "_id",
-              as: "owner"
-            },
-          },
-          {
-            $project: {
-              fullName: 1,
-              username: 1,
-              avatar: 1
+              localField: "owner",
+              as: "owner",
+              pipeline: ([
+                {
+                  $project: {
+                    username: 1,
+                    fullName: 1,
+                    avatar: 1
+                  }
+                },
+              ])
             }
           },
           {
@@ -429,10 +449,22 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                 $first: "$owner"
               }
             }
-          }
+          },
+          {
+            $project: {
+              thumbnail: 1,
+              title: 1,
+              description: 1,
+              duration: 1,
+              views: 1,
+              owner: 1,
+              createdAt: 1,
+              updatedAt: 1
+            }
+          },
         ])
-      }
-    }
+      },
+    },
   ])
 
   return res
