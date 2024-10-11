@@ -9,12 +9,19 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 const toggleSubscription = asyncHandler(async (req, res) => {
   const { channelId } = req.params
 
-  if (!channelId) {
-    throw new ApiError(400, 'Channel id is missing')
-  }
-
   if (!(isValidObjectId(channelId))) {
     throw new ApiError(400, 'Invalid Channel id')
+  }
+
+  const isSubscribed = await Subscription.findOneAndDelete({
+    subscriber: req.user?._id,
+    channel: channelId
+  });
+
+  if (isSubscribed) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { subscribed: false }, "Channel unsubscribed successfully "))
   }
 
   // Check if the channel exists
@@ -23,63 +30,22 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Channel does not exist")
   }
 
-  // Check if the user is trying to subscribe to their own channel
-  if (channel._id.equals(req.user._id)) {
-    throw new ApiError(400, "You cannot subscribe to your own channel");
-  }
-
-  // Check if the user has already subscribed to the channel
-  const hasSubscribed = await Subscription.findOne({
+  await Subscription.create({
     subscriber: req.user?._id,
     channel: channelId
   })
 
-  // If not subscribed, create a new subscription
-  if (!hasSubscribed) {
-    const subscription = await Subscription.create({
-      subscriber: req.user?._id,
-      channel: channelId
-    })
-
-    if (!subscription) {
-      throw new ApiError(500, "Failed to subscribe")
-    }
-
-    return res
-      .status(200)
-      .json(new ApiResponse(200, subscription, "Channel subscribed successfully"))
-  }
-
-  // If already subscribed, delete the subscription
-  const unsubscribedChannel = await hasSubscribed.deleteOne()
-
-  // Check if the unsubscription was successful
-  if (unsubscribedChannel.deletedCount !== 1) {
-    throw new ApiError(500, 'Failed to unsubscribe')
-  }
-
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, 'Channel unsubscribed successfully'))
-
+    .json(new ApiResponse(200, { subscribed: true }, "Channel Subscribed successfully "))
 })
 
 // Retrieves channels the subscriber is subscribed to, including subscriber count for each channel.
 const getSubscribedChannels = asyncHandler(async (req, res) => {
   const { subscriberId } = req.params
 
-  if (!subscriberId) {
-    throw new ApiError(400, 'Subscriber id is missing')
-  }
-
   if (!(isValidObjectId(subscriberId))) {
     throw new ApiError(400, 'Invalid subscriber id')
-  }
-
-  // Check if the subscriber exists in the User collection
-  const subscriber = await User.findById(subscriberId)
-  if (!subscriber) {
-    throw new ApiError(404, 'Subscriber does not exist')
   }
 
   // Fetch the channels the subscriber is subscribed to using aggregation
@@ -130,11 +96,6 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
       }
     }
   ])
-
-
-  if (!channelsSubscribedTo.length) {
-    throw new ApiError(404, 'No channels found')
-  }
 
   return res
     .status(200)
