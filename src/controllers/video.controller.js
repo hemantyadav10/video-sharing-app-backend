@@ -1,5 +1,6 @@
 import { User } from '../models/user.model.js';
 import { Video } from '../models/video.model.js';
+import { Playlist } from '../models/playlist.model.js';
 import { ApiError } from '../utils/apiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -218,11 +219,11 @@ const updateVideo = asyncHandler(async (req, res) => {
 
   const video = await Video.findById(videoId)
 
-  if(!video) {
+  if (!video) {
     throw new ApiError(404, "Video not found")
   }
 
-  if(!(video.owner.equals(req.user._id))) {
+  if (!(video.owner.equals(req.user._id))) {
     throw new ApiError(403, "You are not authorized to update this video")
   }
 
@@ -293,10 +294,103 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 })
 
 
+const getAllVideos = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
+
+  const pipeline = []
+
+  if (userId) {
+    if (!(isValidObjectId(userId))) {
+      throw new ApiError(400, "Invalid user id")
+    }
+    pipeline.push(
+      {
+        $match: {
+          owner: new mongoose.Types.ObjectId(userId)
+        }
+      }
+    )
+  }
+
+
+  if (query?.trim()) {
+    pipeline.push(
+      {
+        $search: {
+          index: "videos-title",
+          autocomplete: {
+            path: "title",
+            query: query,
+            fuzzy: {
+              maxEdits: 1,
+            },
+          }
+        }
+      }
+    )
+  }
+
+
+  pipeline.push(
+    {
+      $match: {
+        isPublished: true
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner"
+      }
+    },
+    {
+      $addFields: {
+        owner: {
+          $first: "$owner"
+        }
+      }
+    },
+    {
+      $project: {
+        thumbnail: 1,
+        title: 1,
+        description: 1,
+        duration: 1,
+        views: 1,
+        owner: {
+          _id: 1,
+          avatar: 1,
+          fullName: 1,
+          username: 1
+        },
+        createdAt: 1
+      }
+    }
+  )
+
+  const videoAggregate = Video.aggregate(pipeline)
+
+  const filteredVideos = await Video.aggregatePaginate(videoAggregate, {
+    page: parseInt(page),
+    limit: parseInt(limit),
+    sort: (sortBy && sortType) ? { [sortBy]: sortType === 'asc' ? 1 : -1 } : { "createdAt": -1 }
+  })
+  if (filteredVideos.length === 0) {
+    throw new ApiError(404, "Videos not found")
+  }
+
+  return res.status(200).json(new ApiResponse(200, filteredVideos, "Videos fetched successfully"));
+
+})
+
+
 export {
   publishVideo,
   getVideoById,
   deleteVideo,
   updateVideo,
-  togglePublishStatus
+  togglePublishStatus,
+  getAllVideos
 }
