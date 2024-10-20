@@ -4,7 +4,7 @@ import { ApiResponse } from '../utils/ApiResponse.js'
 import { User } from '../models/user.model.js'
 import { uploadOnCloudinary } from '../utils/cloudinary.js'
 import jwt from 'jsonwebtoken'
-import mongoose from 'mongoose'
+import mongoose, { isValidObjectId, model } from 'mongoose'
 
 // Generate and store access and refresh tokens for the user
 const generateAccessAndRefreshTokens = async (user) => {
@@ -303,7 +303,9 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
 // Controller for updating cover image
 const updateUserCoverImage = asyncHandler(async (req, res) => {
-  const coverImageLocalPath = req.file?.path;
+  const coverImageLocalPath = req;
+  console.log(req)
+  console.log('hello')
 
   if (!coverImageLocalPath) {
     throw new ApiError(400, 'Cover image file is missing')
@@ -334,16 +336,16 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 // Fetches user channel info, subscriber counts, and subscription status.
 const getUserChannelInfo = asyncHandler(async (req, res) => {
 
-  const { username } = req.params;
+  const { userId } = req.params;
 
-  if (!username?.trim()) {
-    throw new ApiError(400, 'username is missing');
+  if (!isValidObjectId(userId)) {
+    throw new ApiError(400, 'Invalid user id')
   }
 
   const channel = await User.aggregate([
     {
       $match: {
-        username: username.toLowerCase()
+        _id: new mongoose.Types.ObjectId(userId)
       }
     },
     {

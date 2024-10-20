@@ -13,20 +13,21 @@ import {
 const router = Router()
 
 router.route('/')
-.get(getAllVideos)
-.post(
-  upload.fields([
-    {
-      name: 'video',
-      maxCount: 1
-    },
-    {
-      name: 'thumbnail',
-      maxCount: 1
-    }
-  ]),
-  publishVideo
-)
+  .get(getAllVideos)
+  .post(
+    verifyJWT,
+    upload.fields([
+      {
+        name: 'video',
+        maxCount: 1
+      },
+      {
+        name: 'thumbnail',
+        maxCount: 1
+      }
+    ]),
+    publishVideo
+  )
 
 router.use(verifyJWT);
 
