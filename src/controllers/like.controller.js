@@ -168,7 +168,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
           },
           {
             $addFields: {
-              video_owner: {
+              owner: {
                 $first: "$video_owner"
               }
             }
@@ -182,7 +182,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
               description: 1,
               duration: 1,
               views: 1,
-              video_owner: 1
+              owner: 1
             }
           },
 
