@@ -49,9 +49,18 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
       }
     },
     {
+      $lookup: {
+        from: "videos",
+        foreignField: "_id",
+        localField: "videos",
+        as: "videos"
+      }
+    },
+    {
       $project: {
         name: 1,
         totalVideos: { $size: "$videos" },
+        thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] },
         description: 1,
         createdAt: 1,
         updatedAt: 1
@@ -79,20 +88,20 @@ const getPlaylistById = asyncHandler(async (req, res) => {
   }
 
   // First stage: Match the playlist and ensure it exists
-  const playlist = await Playlist.aggregate([
-    {
-      $match: { _id: new mongoose.Types.ObjectId(playlistId) },
-    },
-    {
-      $project: { _id: 1 } 
-    }
-  ]);
+  // const playlist = await Playlist.aggregate([
+  //   {
+  //     $match: { _id: new mongoose.Types.ObjectId(playlistId) },
+  //   },
+  //   {
+  //     $project: { _id: 1 } 
+  //   }
+  // ]);
 
-  if (playlist.length === 0) {
-    throw new ApiError(404, 'Playlist not found')
-  }
+  // if (playlist.length === 0) {
+  //   throw new ApiError(404, 'Playlist not found')
+  // }
 
-// Now perform the lookups only after confirming the playlist exists
+  // Now perform the lookups only after confirming the playlist exists
   const fullPlaylistData = await Playlist.aggregate([
     {
       $match: {
