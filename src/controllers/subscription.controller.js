@@ -103,7 +103,81 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
 
 })
 
+
+const fetchSubscribedChannelVideos = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query
+
+  const videoAggregate = Subscription.aggregate([
+    {
+      $match: {
+        subscriber: new mongoose.Types.ObjectId(req.user?._id)
+      }
+    },
+    {
+      $lookup: {
+        from: 'videos',
+        localField: 'channel',
+        foreignField: 'owner',
+        as: 'videos',
+        pipeline: ([
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: ([
+                {
+                  $project: {
+                    username: 1,
+                    fullName: 1,
+                    avatar: 1,
+                  }
+                },
+              ])
+            }
+          },
+          {
+            $set: {
+              owner: { $arrayElemAt: ["$owner", 0] }
+            }
+          }
+        ])
+      }
+    },
+    { $unwind: "$videos" },
+    {
+      $project: {
+        _id: "$videos._id",
+        thumbnail: "$videos.thumbnail",
+        title: "$videos.title",
+        description: "$videos.description",
+        createdAt: "$videos.createdAt",
+        updateAt: "$videos.updatedAt",
+        views: "$videos.views",
+        owner: "$videos.owner",
+        duration: "$videos.duration"
+      }
+    },
+    { $sort: { createdAt: -1 } }
+  ])
+
+  const videos = await Subscription.aggregatePaginate(
+    videoAggregate, {
+    page: parseInt(page),
+    limit: parseInt(limit)
+  }
+  )
+
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, videos, 'Videos fetched successfully'))
+})
+
+
 export {
   toggleSubscription,
   getSubscribedChannels,
+  fetchSubscribedChannelVideos
 }

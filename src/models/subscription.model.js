@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const subscriptionSchema = Schema({
   subscriber: {
@@ -10,5 +11,8 @@ const subscriptionSchema = Schema({
     ref: 'User'
   }
 }, { timestamps: true });
+
+subscriptionSchema.plugin(mongooseAggregatePaginate)
+
 
 export const Subscription = mongoose.model('Subscription', subscriptionSchema);
