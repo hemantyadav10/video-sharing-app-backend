@@ -53,12 +53,18 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         from: "videos",
         foreignField: "_id",
         localField: "videos",
-        as: "videos"
+        as: "videos",
+        pipeline: ([
+          {
+            $project: { _id: 1, thumbnail: 1 }
+          }
+        ])
       }
     },
     {
       $project: {
         name: 1,
+        videos: { $map: { input: "$videos", as: "video", in: "$$video._id" } },
         totalVideos: { $size: "$videos" },
         thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] },
         description: 1,
