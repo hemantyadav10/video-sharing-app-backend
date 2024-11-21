@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { globalErrorHandler } from './middlewares/error.middleware.js';
 
 
 const app = express();
@@ -46,6 +47,9 @@ app.use("/api/v1/playlist", playlistRouter)
 app.use("/api/v1/likes", likeRouter)
 app.use("/api/v1/healthcheck", healthcheckRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
+
+// Global handler should be used after all routes and middlewares
+app.use(globalErrorHandler)
 
 
 export { app }
