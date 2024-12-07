@@ -25,7 +25,7 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
   if (like) {
     return res
       .status(200)
-      .json(new ApiResponse(200, {}, "Video unliked successfully"));
+      .json(new ApiResponse(200, like, "Video unliked successfully"));
   }
 
   // Check if the video exists 
@@ -201,6 +201,11 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         _id: 0,
         createdAt: 1,
         video: 1,
+      }
+    },
+    {
+      $sort: {
+        createdAt: -1
       }
     }
   ])

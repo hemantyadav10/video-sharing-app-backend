@@ -4,6 +4,7 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import mongoose, { isValidObjectId } from 'mongoose'
 import { Video } from '../models/video.model.js';
+import { Like } from '../models/like.model.js';
 
 
 // Add a comment to a video
@@ -89,6 +90,9 @@ const deleteComment = asyncHandler(async (req, res) => {
   if (!deletedComment) {
     throw new ApiError(404, 'Comment not found or unauthorized');
   }
+
+  // Delete all likes associated with the comment
+  await Like.deleteMany({ comment: commentId });
 
   return res
     .status(200)

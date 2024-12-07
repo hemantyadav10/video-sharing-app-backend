@@ -26,6 +26,11 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         },
       }
     },
+    {
+      $sort: {
+        createdAt: -1
+      }
+    }
   ])
 
   return res
@@ -83,7 +88,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
   ]);
 
 
-// Set default values if the aggregation returns an empty array
+  // Set default values if the aggregation returns an empty array
   const stats = {
     totalVideos: totalVideos[0]?.totalVideos || 0,
     totalLikes: totalVideos[0]?.totalLikes || 0,
