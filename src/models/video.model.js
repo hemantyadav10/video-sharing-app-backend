@@ -5,36 +5,44 @@ const videoSchema = new Schema({
   videoFile: {
     type: String,  //cloudinary url
     required: true
-  }, 
+  },
   thumbnail: {
     type: String, // cloudinary url
     required: true
-  }, 
+  },
   title: {
-    type: String, 
-    required: true, 
+    type: String,
+    required: true,
     index: true
-  }, 
+  },
   description: {
-    type: String, 
+    type: String,
     required: true
-  }, 
+  },
   duration: {
     type: Number, // time by cloudinary
     required: true
-  }, 
-  views:{
-    type: Number, 
+  },
+  views: {
+    type: Number,
     default: 0
-  }, 
+  },
   isPublished: {
-    type: Boolean, 
-    default: true
-  }, 
+    type: Boolean,
+    default: false
+  },
   owner: {
-    type: Schema.Types.ObjectId, 
+    type: Schema.Types.ObjectId,
     ref: "User"
-  }
+  },
+  video_publicId: {
+    type: String,
+    required: true
+  },
+  thumbnail_publicId: {
+    type: String,
+    required: true
+  },
 }, { timestamps: true })
 
 
