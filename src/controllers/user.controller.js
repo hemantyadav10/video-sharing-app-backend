@@ -411,49 +411,42 @@ const getUserChannelInfo = asyncHandler(async (req, res) => {
 
 })
 
-// Fetch user's watch history with video details and owner information
+// // Fetch user's watch history with video details and owner information
+
 const getWatchHistory = asyncHandler(async (req, res) => {
-  const user = await User.aggregate([
+  const { limit, page } = req.query
+  const aggregationPipeline = [
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(req.user._id)
-      }
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
     },
     {
-      $project: {
-        watchHistory: 1
-      }
+      $unwind: "$watchHistory",
     },
     {
       $lookup: {
-        from: 'videos',
-        localField: 'watchHistory',
+        from: "videos",
+        localField: "watchHistory.videos",
         foreignField: "_id",
-        as: "watchHistory",
-        pipeline: ([
+        as: "videos",
+        pipeline: [
           {
             $lookup: {
               from: "users",
-              foreignField: "_id",
               localField: "owner",
+              foreignField: "_id",
               as: "owner",
-              pipeline: ([
+              pipeline: [
                 {
                   $project: {
                     username: 1,
                     fullName: 1,
-                    avatar: 1
-                  }
+                    avatar: 1,
+                  },
                 },
-              ])
-            }
-          },
-          {
-            $addFields: {
-              owner: {
-                $first: "$owner"
-              }
-            }
+              ],
+            },
           },
           {
             $project: {
@@ -462,20 +455,50 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               description: 1,
               duration: 1,
               views: 1,
-              owner: 1,
+              owner: { $arrayElemAt: ["$owner", 0] },
               createdAt: 1,
-              updatedAt: 1
-            }
+              updatedAt: 1,
+            },
           },
-        ])
+        ],
       },
     },
-  ])
+    {
+      $project: {
+        date: "$watchHistory.date",
+        videos: 1,
+      },
+    },
+    {
+      $group: {
+        _id: "$date",
+        videos: { $push: "$videos" },
+      },
+    },
+    {
+      $project: {
+        date: "$_id",
+        videos: { $arrayElemAt: ["$videos", 0] },
+      },
+    },
+    {
+      $sort: { date: -1 },
+    },
+  ];
+
+  // Create the aggregate object
+  const aggregate = User.aggregate(aggregationPipeline);
+
+  const watchHistory = await User.aggregatePaginate(aggregate, {
+    limit: parseInt(limit) || 3,
+    page: parseInt(page) || 1, 
+  });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, user[0].watchHistory, 'Watch history fetched successfully'))
-})
+    .json(new ApiResponse(200, watchHistory, "Watch history fetched successfully"));
+});
+
 
 const clearWatchHistory = asyncHandler(async (req, res) => {
   const userId = req?.user._id

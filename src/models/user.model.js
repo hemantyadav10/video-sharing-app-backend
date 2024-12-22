@@ -1,6 +1,21 @@
 import mongoose, { Schema } from "mongoose";
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
+import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2'
+
+
+const watchHistorySchema = new Schema({
+  date: {
+    type: Date,
+    required: true,
+  },
+  videos: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Video"
+    }
+  ]
+})
 
 // Define the User schema
 const userSchema = new Schema({
@@ -33,12 +48,7 @@ const userSchema = new Schema({
   coverImage: {
     type: String, // cloudinary url
   },
-  watchHistory: [
-    {
-      type: Schema.Types.ObjectId,
-      ref: "Video"
-    }
-  ],
+  watchHistory: [watchHistorySchema],
   password: {
     type: String,
     required: [true, 'Password is required']
@@ -93,5 +103,5 @@ userSchema.methods.generateRefreshToken = function () {
   )
 }
 
-
+userSchema.plugin(mongooseAggregatePaginate)
 export const User = mongoose.model('User', userSchema)
