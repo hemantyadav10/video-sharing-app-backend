@@ -2,9 +2,9 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/apiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { User } from '../models/user.model.js'
-import { uploadOnCloudinary } from '../utils/cloudinary.js'
+import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import jwt from 'jsonwebtoken'
-import mongoose, { isValidObjectId, model } from 'mongoose'
+import mongoose, { isValidObjectId } from 'mongoose'
 
 // Generate and store access and refresh tokens for the user
 const generateAccessAndRefreshTokens = async (user) => {
@@ -279,11 +279,15 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 // Controller for updating avatar
 const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
-  console.log(avatarLocalPath)
 
   if (!avatarLocalPath) {
     throw new ApiError(400, 'Avatar file is missing')
   }
+
+  const response = await deleteFromCloudinary({
+    public_id: req.user.avatar_publicId,
+    resource_type: 'image'
+  })
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
@@ -295,11 +299,13 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     req.user?._id,
     {
       $set: {
-        avatar: avatar.url
+        avatar: avatar.url,
+        avatar_publicId: avatar.public_id
       }
     },
     { new: true }
   ).select("-password -refreshToken")
+
 
   return res
     .status(200)
@@ -309,12 +315,17 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
 // Controller for updating cover image
 const updateUserCoverImage = asyncHandler(async (req, res) => {
-  const coverImageLocalPath = req;
-  console.log(req)
-  console.log('hello')
+  const coverImageLocalPath = req?.file.path;
 
   if (!coverImageLocalPath) {
     throw new ApiError(400, 'Cover image file is missing')
+  }
+
+  if (req.user && req.user.coverImage !== '') {
+    const response = await deleteFromCloudinary({
+      public_id: req.user.coverImage_publicId,
+      resource_type: 'image'
+    })
   }
 
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
@@ -327,7 +338,8 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     req.user?._id,
     {
       $set: {
-        coverImage: coverImage.url
+        coverImage: coverImage.url,
+        coverImage_publicId: coverImage.public_id
       }
     },
     { new: true }
@@ -396,7 +408,8 @@ const getUserChannelInfo = asyncHandler(async (req, res) => {
         isSubscribed: 1,
         avatar: 1,
         coverImage: 1,
-        email: 1
+        email: 1,
+        createdAt: 1
       }
     }
   ])
@@ -491,7 +504,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
   const watchHistory = await User.aggregatePaginate(aggregate, {
     limit: parseInt(limit) || 3,
-    page: parseInt(page) || 1, 
+    page: parseInt(page) || 1,
   });
 
   return res
