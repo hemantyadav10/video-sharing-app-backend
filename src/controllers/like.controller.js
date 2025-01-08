@@ -214,7 +214,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
   if (likedVideos?.length === 0) {
     return res
       .status(200)
-      .json(new ApiResponse(404, {}, "No liked videos found"))
+      .json(new ApiResponse(404, [], "No liked videos found"))
   }
 
   return res
