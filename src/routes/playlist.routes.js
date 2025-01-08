@@ -14,13 +14,14 @@ const router = Router();
 
 router.route("/user/:userId").get(getUserPlaylists);
 
+router.route("/:playlistId").get(getPlaylistById);
+
 router.use(verifyJWT);
 
 router.route("/").post(createPlaylist)
 
 router
   .route("/:playlistId")
-  .get(getPlaylistById)
   .patch(updatePlaylist)
   .delete(deletePlaylist);
 

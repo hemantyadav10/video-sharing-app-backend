@@ -6,14 +6,16 @@ import {
     updateComment
 } from "../controllers/comment.controller.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
+import { optionalAuth } from "../middlewares/optionalAuth.middleware.js";
 
 const router = Router();
 
-router.use(verifyJWT);
 
 router.route("/:videoId")
-    .get(getVideoComments)
-    .post(addComment);
+.get(optionalAuth, getVideoComments)
+.post(verifyJWT, addComment);
+
+router.use(verifyJWT);
 
 router.route("/c/:commentId")
     .delete(deleteComment)

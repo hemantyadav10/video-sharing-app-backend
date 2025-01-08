@@ -9,6 +9,8 @@ import {
   togglePublishStatus,
   updateVideo
 } from "../controllers/video.controller.js";
+import { optionalAuth } from "../middlewares/optionalAuth.middleware.js";
+
 
 const router = Router()
 
@@ -29,14 +31,13 @@ router.route('/')
     publishVideo
   )
 
-router.use(verifyJWT);
 
 router
   .route('/:videoId')
-  .get(getVideoById)
-  .delete(deleteVideo)
-  .patch(upload.single("thumbnail"), updateVideo);
+  .get(optionalAuth, getVideoById)
+  .delete(verifyJWT, deleteVideo)
+  .patch(verifyJWT, upload.single("thumbnail"), updateVideo);
 
-router.route("/toggle/publish/:videoId").patch(togglePublishStatus);
+router.route("/toggle/publish/:videoId").patch(verifyJWT, togglePublishStatus);
 
 export default router;
