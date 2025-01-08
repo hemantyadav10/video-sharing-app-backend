@@ -1,5 +1,6 @@
 import mongoose, { Schema } from 'mongoose'
 import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2'
+import { categories } from '../constants.js'
 
 const videoSchema = new Schema({
   videoFile: {
@@ -19,6 +20,15 @@ const videoSchema = new Schema({
     type: String,
     required: true
   },
+  category: {
+    type: String,
+    enum: categories,
+    required: true,
+  },
+  tags: [{
+    type: String,
+
+  }],
   duration: {
     type: Number, // time by cloudinary
     required: true
@@ -43,6 +53,7 @@ const videoSchema = new Schema({
     type: String,
     required: true
   },
+
 }, { timestamps: true })
 
 
