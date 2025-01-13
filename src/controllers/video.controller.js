@@ -509,11 +509,134 @@ const getAllVideos = asyncHandler(async (req, res) => {
   );
 });
 
+const getVideosByTag = asyncHandler(async (req, res) => {
+  const { tag } = req.params
+  const { limit = 12, page = 1 } = req.query
+
+  const pipeline = Video.aggregate([
+    {
+      $match: {
+        isPublished: true,
+        tags: { $in: [tag] }, // Match the tag in the tags array
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [{
+          $project: {
+            _id: 1,
+            avatar: 1,
+            fullName: 1,
+            username: 1,
+          }
+        }]
+      }
+    },
+    {
+      $project: {
+        thumbnail: 1,
+        title: 1,
+        description: 1,
+        duration: 1,
+        views: 1,
+        owner: { $arrayElemAt: ["$owner", 0] },
+        createdAt: 1,
+        updatedAt: 1,
+      }
+    }
+  ])
+
+  const videos = await Video.aggregatePaginate(pipeline, {
+    limit: parseInt(limit) || 12,
+    page: parseInt(page) || 1,
+    sort: { createdAt: -1 }
+  })
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, videos, 'Videos fetched successfully'))
+})
+
+const getRelatedVideos = asyncHandler(async (req, res) => {
+  const { videoId } = req.params
+  const { page = 1, limit = 10 } = req.query
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, 'Invalid video id.')
+  }
+
+  const video = await Video.findById(videoId)
+
+  if (!video) {
+    throw new ApiError(404, 'Video not found.')
+  }
+
+  const aggregationPipeline = Video.aggregate([
+    {
+      $match: {
+        $or: [
+          { tags: { $in: video.tags } },
+          { category: video.category },
+        ],
+        _id: { $ne: video._id }
+      }
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: ([
+          {
+            $project: {
+              _id: 1,
+              avatar: 1,
+              fullName: 1,
+              username: 1,
+            }
+          }
+        ])
+      }
+    },
+    {
+      $project: {
+        thumbnail: 1,
+        title: 1,
+        description: 1,
+        duration: 1,
+        views: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        owner: { $arrayElemAt: ["$owner", 0] },
+        category: 1,
+        tags: 1
+      }
+    }
+  ])
+
+  const relatedVideos = await Video.aggregatePaginate(aggregationPipeline, {
+    sort: { views: -1 },
+    limit: parseInt(limit) || 10,
+    page: parseInt(page) || 1
+  })
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, relatedVideos, 'Related videos fetched successfully'))
+})
+
 export {
   publishVideo,
   getVideoById,
   deleteVideo,
   updateVideo,
   togglePublishStatus,
-  getAllVideos
+  getAllVideos,
+  getVideosByTag,
+  getRelatedVideos
 }

@@ -4,7 +4,9 @@ import { upload } from "../middlewares/multer.middleware.js";
 import {
   deleteVideo,
   getAllVideos,
+  getRelatedVideos,
   getVideoById,
+  getVideosByTag,
   publishVideo,
   togglePublishStatus,
   updateVideo
@@ -31,6 +33,8 @@ router.route('/')
     publishVideo
   )
 
+router.route('/tags/:tag').get(getVideosByTag)
+
 
 router
   .route('/:videoId')
@@ -39,5 +43,7 @@ router
   .patch(verifyJWT, upload.single("thumbnail"), updateVideo);
 
 router.route("/toggle/publish/:videoId").patch(verifyJWT, togglePublishStatus);
+
+router.route('/related/:videoId').get(getRelatedVideos)
 
 export default router;
