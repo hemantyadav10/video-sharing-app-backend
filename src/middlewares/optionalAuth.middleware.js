@@ -10,7 +10,13 @@ export const optionalAuth = asyncHandler(async (req, res, next) => {
     return next();
   }
 
-  const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+  let decodedToken;
+
+  try {
+    decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+  } catch (error) {
+    throw new ApiError(401, error.message, error)
+  }
 
   const user = await User.findById(decodedToken?._id).select("_id");
 
