@@ -135,30 +135,39 @@ const loginUser = asyncHandler(async (req, res) => {
       {
         user: userResponse,
         accessToken,
-        refreshToken
       },
       "User logged in successfully"
     ))
-
 })
 
 // Handle user logout
 const logoutUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndUpdate(
-    req.user._id,
-    { $unset: { refreshToken: 1 } },
-  )
+  const refreshToken = req.cookies?.refreshToken
 
   const options = {
     httpOnly: true,
     secure: true,
   }
 
+  if (!refreshToken) {
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(new ApiResponse(200, {}, "Logged out successfully"))
+  }
+
+  await User.findOneAndUpdate(
+    { refreshToken: refreshToken },
+    { $unset: { refreshToken: 1 } },
+    { new: true }
+  )
+
   return res
     .status(200)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
-    .json(new ApiResponse(204, {}, "User logged out"))
+    .json(new ApiResponse(200, {}, "User logged out"))
 })
 
 // Refreshes the access token using a valid refresh token.
@@ -175,7 +184,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   const user = await User.findById(decodedToken?._id)
 
   if (!user) {
-    throw new ApiError(401, "Invalid refresh token")
+    throw new ApiError(401, "Invalid refresh token: user not found")
   }
 
   if (incomingRefreshToken !== user?.refreshToken) {
@@ -195,10 +204,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     .cookie("refreshToken", refreshToken, options)
     .json(new ApiResponse(
       200,
-      {
-        accessToken,
-        refreshToken
-      },
+      { accessToken },
       "Access token refreshed"
     ))
 })

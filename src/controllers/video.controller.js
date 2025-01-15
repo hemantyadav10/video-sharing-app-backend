@@ -487,6 +487,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
         avatar: 1,
         fullName: 1,
         username: 1,
+        createdAt: 1,
       },
       createdAt: 1,
       category: 1
