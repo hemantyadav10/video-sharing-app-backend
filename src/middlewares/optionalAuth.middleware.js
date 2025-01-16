@@ -1,30 +1,32 @@
 import jwt from "jsonwebtoken";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
-import { ApiError } from "../utils/apiError.js";
 
-export const optionalAuth = asyncHandler(async (req, res, next) => {
-  const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer", "").trim();
+export const optionalAuth = asyncHandler(async (req, _res, next) => {
+  const token =
+    req.cookies?.accessToken ||
+    req.header("Authorization")?.replace("Bearer", "").trim();
 
   if (!token) {
+    // No token, proceed as unauthenticated
     return next();
   }
 
-  let decodedToken;
-
   try {
-    decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+    // Verify the token
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+
+    // Fetch the user by ID
+    const user = await User.findById(decodedToken?._id).select("_id");
+
+    // Attach user to request if found
+    if (user) {
+      req.user = user;
+    }
+
+    next();
   } catch (error) {
-    throw new ApiError(401, error.message, error)
+    // Fail silently with req.user unset
+    next();
   }
-
-  const user = await User.findById(decodedToken?._id).select("_id");
-
-  if (!user) {
-    throw new ApiError(401, "Invalid Access Token")
-  }
-
-  req.user = user;
-  next();
-
 })
