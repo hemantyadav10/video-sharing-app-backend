@@ -3,6 +3,7 @@ import { Video } from '../models/video.model.js';
 import mongoose, { isValidObjectId } from 'mongoose';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Subscription } from '../models/subscription.model.js';
+import { ApiError } from '../utils/apiError.js';
 
 const getChannelVideos = asyncHandler(async (req, res) => {
   const videos = await Video.aggregate([
