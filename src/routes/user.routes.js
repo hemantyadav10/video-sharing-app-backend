@@ -11,7 +11,8 @@ import {
   updateAccountDetails,
   updateUserAvatar,
   updateUserCoverImage,
-  clearWatchHistory
+  clearWatchHistory,
+  searchChannels
 } from "../controllers/user.controller.js";
 import { upload } from '../middlewares/multer.middleware.js'
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -55,5 +56,6 @@ router.route('/watch-history')
   .get(verifyJWT, getWatchHistory)
   .delete(verifyJWT, clearWatchHistory)
 
+router.route('/search').get(optionalAuth, searchChannels)
 
 export default router;

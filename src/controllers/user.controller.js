@@ -536,6 +536,79 @@ const clearWatchHistory = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user.watchHistory, 'Watch history cleared successfully.'))
 })
 
+
+const searchChannels = asyncHandler(async (req, res) => {
+  const { query } = req.query
+
+  if (!query?.trim()) {
+    throw new ApiError(400, "Search query cannot be empty")
+  }
+
+  const channels = await User.aggregate([
+    {
+      $search: {
+        index: "default",
+        compound: {
+          should: [
+            {
+              autocomplete: {
+                path: "fullName",
+                query: query,
+                fuzzy: { maxEdits: 1 }
+              }
+            },
+            {
+              text: {
+                path: "username",
+                query: query
+              }
+            }
+          ],
+          minimumShouldMatch: 1
+        }
+      }
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers"
+      }
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers"
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false
+          }
+        }
+      }
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        subscribersCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        email: 1,
+        createdAt: 1
+      }
+    }
+  ]);
+
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channels, "Channels fetched successfully"))
+})
+
 export {
   registerUser,
   loginUser,
@@ -548,5 +621,6 @@ export {
   updateUserCoverImage,
   getUserChannelInfo,
   getWatchHistory,
-  clearWatchHistory
+  clearWatchHistory,
+  searchChannels
 }
