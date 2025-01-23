@@ -6,6 +6,18 @@ import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js
 import jwt from 'jsonwebtoken'
 import mongoose, { isValidObjectId } from 'mongoose'
 
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRY) // Cookie lifespan in milliseconds for the refresh token 
+};
+
+const accessCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY) // Cookie lifespan in milliseconds for the refresh token
+};
+
 // Generate and store access and refresh tokens for the user
 const generateAccessAndRefreshTokens = async (user) => {
   try {
@@ -116,20 +128,14 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user);
 
-
-  const options = {
-    httpOnly: true,
-    secure: true,
-  }
-
   const userResponse = user.toObject();
   delete userResponse.password;
   delete userResponse.refreshToken;
 
   return res
     .status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
+    .cookie("accessToken", accessToken, accessCookieOptions)
+    .cookie("refreshToken", refreshToken, refreshCookieOptions)
     .json(new ApiResponse(
       200,
       {
@@ -144,16 +150,11 @@ const loginUser = asyncHandler(async (req, res) => {
 const logoutUser = asyncHandler(async (req, res) => {
   const refreshToken = req.cookies?.refreshToken
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  }
-
   if (!refreshToken) {
     return res
       .status(200)
-      .clearCookie("accessToken", options)
-      .clearCookie("refreshToken", options)
+      .clearCookie("accessToken", accessCookieOptions)
+      .clearCookie("refreshToken", refreshCookieOptions)
       .json(new ApiResponse(200, {}, "Logged out successfully"))
   }
 
@@ -165,8 +166,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .clearCookie("accessToken", options)
-    .clearCookie("refreshToken", options)
+    .clearCookie("accessToken", accessCookieOptions)
+    .clearCookie("refreshToken", refreshCookieOptions)
     .json(new ApiResponse(200, {}, "User logged out"))
 })
 
@@ -193,15 +194,12 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
   const { refreshToken, accessToken } = await generateAccessAndRefreshTokens(user);
 
-  const options = {
-    httpOnly: true,
-    secure: true
-  }
+  console.log('access token refreshed')
 
   return res
     .status(200)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
+    .cookie("accessToken", accessToken, accessCookieOptions)
+    .cookie("refreshToken", refreshToken, refreshCookieOptions)
     .json(new ApiResponse(
       200,
       { accessToken },
