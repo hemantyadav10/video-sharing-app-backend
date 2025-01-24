@@ -77,12 +77,14 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // Create a new user
   const user = await User.create({
+    username,
+    email,
     fullName,
     avatar: avatar.url,
+    avatar_publicId: avatar.public_id,
     coverImage: coverImage?.url || "",
-    email,
+    coverImage_publicId: coverImage?.public_id || "",
     password,
-    username: username.toLowerCase()
   })
 
   // Fetch and return created user, excluding password and refreshToken
@@ -95,7 +97,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   return res.status(201).json(
-    new ApiResponse(200, createdUser, "User registered successfully")
+    new ApiResponse(200, { userId: createdUser._id }, "Registration successful.")
   )
 
 })
