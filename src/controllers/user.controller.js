@@ -7,15 +7,17 @@ import jwt from 'jsonwebtoken'
 import mongoose, { isValidObjectId } from 'mongoose'
 
 const refreshCookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRY) // Cookie lifespan in milliseconds for the refresh token 
+  httpOnly: true, // Prevents JavaScript from accessing the cookie
+  secure: process.env.NODE_ENV === "production", // Only set over HTTPS in production
+  maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRY), // Cookie lifespan in milliseconds for the refresh token
+  sameSite: 'None', // Required for cross-origin cookies (set in cross-origin requests)
 };
 
 const accessCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY) // Cookie lifespan in milliseconds for the refresh token
+  maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
+  sameSite: 'None',
 };
 
 // Generate and store access and refresh tokens for the user
