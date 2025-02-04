@@ -518,7 +518,7 @@ const getVideosByTag = asyncHandler(async (req, res) => {
     {
       $match: {
         isPublished: true,
-        tags: { $in: [tag] }, // Match the tag in the tags array
+        tags: { $in: [new RegExp(tag, 'i')] }, // Match the tag in the tags array(Using a case-insensitive regex)
       },
     },
     {
@@ -580,7 +580,7 @@ const getRelatedVideos = asyncHandler(async (req, res) => {
     {
       $match: {
         $or: [
-          { tags: { $in: video.tags } },
+          { tags: { $in: video.tags.map(tag => new RegExp(tag, 'i')) } },// Create case-insensitive regex for each tag 
           { category: video.category },
         ],
         _id: { $ne: video._id }

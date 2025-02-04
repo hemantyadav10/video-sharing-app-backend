@@ -8,14 +8,14 @@ import mongoose, { isValidObjectId } from 'mongoose'
 
 const refreshCookieOptions = {
   httpOnly: true, // Prevents JavaScript from accessing the cookie
-  secure: process.env.NODE_ENV === "production", // Only set over HTTPS in production
+  secure: true,
   maxAge: parseInt(process.env.REFRESH_TOKEN_EXPIRY), // Cookie lifespan in milliseconds for the refresh token, 
   sameSite: 'None', // Required for cross-origin cookies (set in cross-origin requests)
 };
 
 const accessCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  secure: true,
   maxAge: parseInt(process.env.ACCESS_TOKEN_EXPIRY),
   sameSite: 'None',
 };
