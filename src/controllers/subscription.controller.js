@@ -43,13 +43,14 @@ const toggleSubscription = asyncHandler(async (req, res) => {
 // Retrieves channels the subscriber is subscribed to, including subscriber count for each channel.
 const getSubscribedChannels = asyncHandler(async (req, res) => {
   const { subscriberId } = req.params
+  const { limit = 6, page = 1 } = req.query
+
 
   if (!(isValidObjectId(subscriberId))) {
     throw new ApiError(400, 'Invalid subscriber id')
   }
 
-  // Fetch the channels the subscriber is subscribed to using aggregation
-  const channelsSubscribedTo = await Subscription.aggregate([
+  const pipeline = Subscription.aggregate([
     {
       $match: {
         subscriber: new mongoose.Types.ObjectId(subscriberId)
@@ -96,6 +97,11 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
       }
     }
   ])
+  const channelsSubscribedTo = await Subscription.aggregatePaginate(pipeline, {
+    limit: parseInt(limit) || 6,
+    page: parseInt(page) || 1,
+    sort: { createdAt: -1 }
+  })
 
   return res
     .status(200)
