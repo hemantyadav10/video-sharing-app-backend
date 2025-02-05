@@ -4,7 +4,7 @@ import fs from "fs";
 export const validateFile = (req, _res, next) => {
   // Define file size limits
   const MAX_VIDEO_SIZE = 30; // MB
-  const MAX_IMAGE_SIZE = 1; // MB
+  const MAX_IMAGE_SIZE = 3; // MB
 
   const ALLOWED_MIME_TYPES = {
     video: ["video/mp4", "video/webm"],
