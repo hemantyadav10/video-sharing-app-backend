@@ -12,6 +12,7 @@ import {
   updateVideo
 } from "../controllers/video.controller.js";
 import { optionalAuth } from "../middlewares/optionalAuth.middleware.js";
+import { validateFile } from "../middlewares/validateFile.middleware.js";
 
 
 const router = Router()
@@ -30,6 +31,7 @@ router.route('/')
         maxCount: 1
       }
     ]),
+    validateFile,
     publishVideo
   )
 
@@ -40,7 +42,7 @@ router
   .route('/:videoId')
   .get(optionalAuth, getVideoById)
   .delete(verifyJWT, deleteVideo)
-  .patch(verifyJWT, upload.single("thumbnail"), updateVideo);
+  .patch(verifyJWT, upload.single("thumbnail"), validateFile, updateVideo);
 
 router.route("/toggle/publish/:videoId").patch(verifyJWT, togglePublishStatus);
 
