@@ -58,26 +58,13 @@ export const validateFile = (req, _res, next) => {
 
     // Validate single file (if present)
     if (singleFile) {
-      if (singleFile.mimetype.startsWith("image")) {
-        if (!ALLOWED_MIME_TYPES.image.includes(singleFile.mimetype)) {
-          deleteFile(singleFile);
-          throw new ApiError(400, "Invalid image format. Allowed: JPEG, PNG, WEBP.");
-        }
-        if (singleFile.size > MAX_IMAGE_SIZE * 1024 * 1024) {
-          deleteFile(singleFile);
-          throw new ApiError(400, `Image file size exceeds ${MAX_IMAGE_SIZE}MB.`);
-        }
+      if (!ALLOWED_MIME_TYPES.image.includes(singleFile.mimetype)) {
+        deleteFile(singleFile);
+        throw new ApiError(400, "Invalid image format. Allowed: JPEG, PNG, WEBP.");
       }
-
-      if (singleFile.mimetype.startsWith("video")) {
-        if (!ALLOWED_MIME_TYPES.video.includes(singleFile.mimetype)) {
-          deleteFile(singleFile);
-          throw new ApiError(400, "Invalid video format. Allowed: MP4, WEBM.");
-        }
-        if (singleFile.size > MAX_VIDEO_SIZE * 1024 * 1024) {
-          deleteFile(singleFile);
-          throw new ApiError(400, `Video file size exceeds ${MAX_VIDEO_SIZE}MB.`);
-        }
+      if (singleFile.size > MAX_IMAGE_SIZE * 1024 * 1024) {
+        deleteFile(singleFile);
+        throw new ApiError(400, `Image file size exceeds ${MAX_IMAGE_SIZE}MB.`);
       }
     }
 
