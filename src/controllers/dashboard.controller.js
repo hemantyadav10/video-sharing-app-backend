@@ -6,7 +6,9 @@ import { Subscription } from '../models/subscription.model.js';
 import { ApiError } from '../utils/apiError.js';
 
 const getChannelVideos = asyncHandler(async (req, res) => {
-  const videos = await Video.aggregate([
+  const { limit = 12, page = 1 } = req.query
+
+  const pipeline = Video.aggregate([
     {
       $match: {
         owner: new mongoose.Types.ObjectId(req.user?._id)
@@ -27,12 +29,13 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         },
       }
     },
-    {
-      $sort: {
-        createdAt: -1
-      }
-    }
   ])
+
+  const videos = await Video.aggregatePaginate(pipeline, {
+    limit: parseInt(limit),
+    page: parseInt(page),
+    sort: { createdAt: -1 }
+  })
 
   return res
     .status(200)

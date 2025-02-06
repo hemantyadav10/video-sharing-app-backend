@@ -54,7 +54,6 @@ const userSchema = new Schema({
   },
   coverImage_publicId: {
     type: String,
-    required: true
   },
   watchHistory: [watchHistorySchema],
   password: {
