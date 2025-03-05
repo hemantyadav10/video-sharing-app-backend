@@ -118,7 +118,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({
     $or: [{ username }, { email }]
-  })
+  }).select('-watchHistory')
 
   if (!user) {
     throw new ApiError(404, "User not found with the provided username or email")

@@ -10,7 +10,7 @@ import { Like } from '../models/like.model.js';
 // Add a comment to a video
 const addComment = asyncHandler(async (req, res) => {
   const { content } = req.body
-  const { videoId } = req.params
+  const { videoId, parentId } = req.params
 
   // check if content is there and videoId is a valid id
   if (!content?.trim()) {
@@ -26,16 +26,24 @@ const addComment = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video does not exist");
   }
 
-  //create comment if video exists
+  // If parent id is provided, check if the parent comment exists
+  if (parentId) {
+    if (!isValidObjectId(parentId)) {
+      throw new ApiError(400, 'Invalid parent comment id')
+    }
+    const parentComment = await Comment.findById(parentId)
+    if (!parentComment) {
+      throw new ApiError(404, "Parent comment doesnot exists")
+    }
+  }
+
+  //create comment or a reply
   const comment = await Comment.create({
     content: content.trim(),
     video: videoId,
-    owner: req.user?._id
+    owner: req.user?._id,
+    parentId: parentId || null
   })
-
-  if (!comment) {
-    throw new ApiError(500, 'Failed to add comment')
-  }
 
   return res
     .status(200)
@@ -91,8 +99,18 @@ const deleteComment = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Comment not found or unauthorized');
   }
 
-  // Delete all likes associated with the comment
-  await Like.deleteMany({ comment: commentId });
+  // Delete all likes associated with the comment and replies
+  await Like.deleteMany({
+    comment: {
+      $in: [
+        commentId, // Deletes likes of the main comment
+        ...await Comment.find({ parentId: commentId }).distinct('_id') // Deletes likes of all replies
+      ]
+    }
+  });
+
+  // Delete all replies associated with the comment
+  await Comment.deleteMany({ parentId: commentId });
 
   return res
     .status(200)
@@ -111,7 +129,106 @@ const getVideoComments = asyncHandler(async (req, res) => {
   const comments = Comment.aggregate([
     {
       $match: {
-        video: new mongoose.Types.ObjectId(videoId)
+        video: new mongoose.Types.ObjectId(videoId),
+        parentId: null
+      }
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: ([
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1
+            }
+          }
+        ])
+      }
+    },
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "comment",
+        as: "likes",
+      }
+    },
+    {
+      $lookup: {
+        from: "comments",
+        localField: "_id",
+        foreignField: "parentId",
+        as: "replies"
+      }
+    },
+    {
+      $addFields: {
+        owner: {
+          $first: "$owner"
+        },
+        likesCount: {
+          $size: "$likes"
+        },
+        isLiked: {
+          $cond: {
+            if: { $in: [req.user?._id, "$likes.likedBy"] },
+            then: true,
+            else: false
+          }
+        },
+        repliesCount: {
+          $size: "$replies"
+        }
+      }
+    },
+    {
+      $project: {
+        content: 1,
+        owner: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        likesCount: 1,
+        isLiked: 1,
+        repliesCount: 1
+      }
+    }
+  ])
+
+  const limitedComments = await Comment.aggregatePaginate(comments, {
+    limit: Number(limit),
+    page: Number(page),
+    sort: { "createdAt": sortBy === 'newest' ? -1 : 1 }
+  })
+
+  const totalCommentsCount = await Comment.countDocuments({ video: videoId });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {
+      comments: limitedComments,
+      totalCommentsCount
+    }, "Video comments fetched successfully"))
+
+})
+
+// Fetch all comment replies 
+const fetchCommentReplies = asyncHandler(async (req, res) => {
+  const { commentId } = req.params
+  const { limit = 5, page = 1 } = req.query
+
+  if (!isValidObjectId(commentId)) {
+    throw new ApiError(400, "Invalid comment Id");
+  }
+
+  const pipeline = Comment.aggregate([
+    {
+      $match: {
+        parentId: new mongoose.Types.ObjectId(commentId)
       }
     },
     {
@@ -153,7 +270,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
             then: true,
             else: false
           }
-        }
+        },
       }
     },
     {
@@ -163,26 +280,26 @@ const getVideoComments = asyncHandler(async (req, res) => {
         createdAt: 1,
         updatedAt: 1,
         likesCount: 1,
-        isLiked: 1
+        isLiked: 1,
       }
     }
   ])
 
-  const limitedComments = await Comment.aggregatePaginate(comments, {
+  const replies = await Comment.aggregatePaginate(pipeline, {
     limit: Number(limit),
     page: Number(page),
-    sort: { "createdAt": sortBy === 'newest' ? -1 : 1 }
+    sort: { "createdAt": 1 }
   })
 
   return res
     .status(200)
-    .json(new ApiResponse(200, limitedComments, "Video comments fetched successfully"))
-
+    .json(new ApiResponse(200, replies, "Replies fetched successfully"))
 })
 
 export {
   addComment,
   deleteComment,
   updateComment,
-  getVideoComments
+  getVideoComments,
+  fetchCommentReplies
 }

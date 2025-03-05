@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
     addComment,
     deleteComment,
+    fetchCommentReplies,
     getVideoComments,
     updateComment
 } from "../controllers/comment.controller.js"
@@ -12,12 +13,17 @@ const router = Router();
 
 
 router.route("/:videoId")
-.get(optionalAuth, getVideoComments)
-.post(verifyJWT, addComment);
+    .get(optionalAuth, getVideoComments)
+    .post(verifyJWT, addComment);
+
+router.route("/replies/:commentId").get(optionalAuth, fetchCommentReplies)
 
 router.use(verifyJWT);
+
+router.route("/:videoId/:parentId").post(addComment)
 
 router.route("/c/:commentId")
     .delete(deleteComment)
     .patch(updateComment)
+
 export default router
