@@ -69,7 +69,8 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         thumbnail: { $arrayElemAt: ["$videos.thumbnail", 0] },
         description: 1,
         createdAt: 1,
-        updatedAt: 1
+        updatedAt: 1, 
+        owner: 1
       }
     }
   ])
