@@ -181,9 +181,87 @@ const fetchSubscribedChannelVideos = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, videos, 'Videos fetched successfully'))
 })
 
+const getUserChannelSubscribers = asyncHandler(async (req, res) => {
+  const { limit = 6, page = 1, sortField = "createdAt", sortOrder = "desc" } = req.query
+  const userId = req?.user._id
+
+  const sortOptions = {};
+  if (sortField === "subscribersCount") {
+    sortOptions["subscriber.subscribersCount"] = sortOrder === "desc" ? -1 : 1;
+  } else {
+    sortOptions[sortField] = sortOrder === "desc" ? -1 : 1;
+  }
+
+  const pipeline = Subscription.aggregate([
+    {
+      $match: {
+        channel: new mongoose.Types.ObjectId(userId)
+      }
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "subscriber",
+        foreignField: "_id",
+        as: "subscriber",
+        pipeline: ([
+          {
+            $lookup: {
+              from: "subscriptions",
+              localField: "_id",
+              foreignField: "channel",
+              as: "subscribers"
+            }
+          },
+          {
+            $addFields: {
+              subscribersCount: {
+                $size: "$subscribers"
+              }
+            }
+          },
+          {
+            $project: {
+              fullName: 1,
+              username: 1,
+              avatar: 1,
+              subscribersCount: 1
+            },
+          },
+        ])
+      }
+    },
+    {
+      $addFields: {
+        subscriber: {
+          $first: "$subscriber"
+        }
+      }
+    },
+    { $sort: sortOptions },
+    {
+      $project: {
+        subscriber: 1,
+        createdAt: 1,
+        updatedAt: 1
+      }
+    }
+  ])
+  const subscribers = await Subscription.aggregatePaginate(pipeline, {
+    limit: parseInt(limit) || 6,
+    page: parseInt(page) || 1,
+  })
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, subscribers, 'Subscribers fetched successfully'))
+
+})
+
 
 export {
   toggleSubscription,
   getSubscribedChannels,
-  fetchSubscribedChannelVideos
+  fetchSubscribedChannelVideos,
+  getUserChannelSubscribers
 }

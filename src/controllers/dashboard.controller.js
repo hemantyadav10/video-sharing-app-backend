@@ -5,8 +5,18 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { Subscription } from '../models/subscription.model.js';
 import { ApiError } from '../utils/apiError.js';
 
+
+const SORT_ORDER = {
+  asc: 1,
+  desc: -1
+}
+
 const getChannelVideos = asyncHandler(async (req, res) => {
-  const { limit = 12, page = 1 } = req.query
+  const { limit = 12, page = 1, sortBy = "createdAt", sortOrder = "desc" } = req.query
+
+  if (!['createdAt', "likes", "views", "title"].includes(sortBy) || !["desc", "asc"].includes(sortOrder)) {
+    throw new ApiError(400, "Invalid sorting options")
+  }
 
   const pipeline = Video.aggregate([
     {
@@ -29,12 +39,13 @@ const getChannelVideos = asyncHandler(async (req, res) => {
         },
       }
     },
+
   ])
 
   const videos = await Video.aggregatePaginate(pipeline, {
     limit: parseInt(limit),
     page: parseInt(page),
-    sort: { createdAt: -1 }
+    sort: { [sortBy]: SORT_ORDER[sortOrder] }
   })
 
   return res

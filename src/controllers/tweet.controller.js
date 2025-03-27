@@ -85,6 +85,8 @@ const deleteTweet = asyncHandler(async (req, res) => {
 // Get all tweets for a specific user
 const getUserTweets = asyncHandler(async (req, res) => {
   const { userId } = req.params;
+  const { limit } = req.query;
+
   if (!userId) {
     throw new ApiError(400, "user id is missing")
   }
@@ -93,7 +95,7 @@ const getUserTweets = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid user id')
   }
 
-  const tweetsList = await Tweet.aggregate([
+  const pipeline = [
     {
       $match: {
         owner: new mongoose.Types.ObjectId(userId)
@@ -163,7 +165,15 @@ const getUserTweets = asyncHandler(async (req, res) => {
         isLiked: 1
       },
     },
-  ]);
+  ]
+
+  if (limit && !isNaN(limit)) {
+    pipeline.push({
+      $limit: parseInt(limit, 10),
+    });
+  }
+
+  const tweetsList = await Tweet.aggregate(pipeline);
 
   return res
     .status(200)
