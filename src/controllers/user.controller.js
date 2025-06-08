@@ -82,9 +82,9 @@ const registerUser = asyncHandler(async (req, res) => {
     username,
     email,
     fullName,
-    avatar: avatar.url,
+    avatar: avatar.secure_url,
     avatar_publicId: avatar.public_id,
-    coverImage: coverImage?.url || "",
+    coverImage: coverImage?.secure_url || "",
     coverImage_publicId: coverImage?.public_id || "",
     password,
   })
@@ -299,7 +299,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-  if (!avatar.url) {
+  if (!avatar.secure_url) {
     throw new ApiError(400, 'Avatar file is missing')
   }
 
@@ -307,7 +307,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     req.user?._id,
     {
       $set: {
-        avatar: avatar.url,
+        avatar: avatar.secure_url,
         avatar_publicId: avatar.public_id
       }
     },
@@ -338,7 +338,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if (!coverImage.url) {
+  if (!coverImage.secure_url) {
     throw new ApiError(400, 'Cover image is missing')
   }
 
@@ -346,7 +346,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     req.user?._id,
     {
       $set: {
-        coverImage: coverImage.url,
+        coverImage: coverImage.secure_url,
         coverImage_publicId: coverImage.public_id
       }
     },

@@ -46,9 +46,9 @@ const publishVideo = asyncHandler(async (req, res) => {
   }
 
   const videoDetails = await Video.create({
-    videoFile: video?.url,
+    videoFile: video?.secure_url,
     video_publicId: video?.public_id,
-    thumbnail: thumbnail?.url,
+    thumbnail: thumbnail?.secure_url,
     thumbnail_publicId: thumbnail?.public_id,
     title,
     description,
@@ -330,7 +330,7 @@ const updateVideo = asyncHandler(async (req, res) => {
       $set: {
         ...(title && { title: title.trim() }),
         ...(description && { description: description.trim() }),
-        ...(thumbnail && { thumbnail: thumbnail.url, thumbnail_publicId: thumbnail.public_id }),
+        ...(thumbnail && { thumbnail: thumbnail.secure_url, thumbnail_publicId: thumbnail.public_id }),
         ...(category && { category: category }),
         ...(tags && { tags: tags }),
       }
