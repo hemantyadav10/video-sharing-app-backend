@@ -82,40 +82,95 @@ const updateComment = asyncHandler(async (req, res) => {
 
 })
 
-// Delete a comment by its ID
+/**
+ * Deletes a comment by its ID, ensuring the logged-in user is the owner.
+ * 
+ * - Validates the comment ID format.
+ * - Checks ownership to prevent unauthorized deletion.
+ * - If the comment has no likes or replies, deletes it directly.
+ * - If the comment has likes or replies:
+ *    - Deletes likes on the main comment and replies.
+ *    - Deletes all replies.
+ *    - Deletes the main comment.
+ *    - All deletions are wrapped in a MongoDB transaction for atomicity.
+ * 
+ * Responds with a success message upon complete deletion.
+ * Rolls back all changes and returns an error if any step fails.
+ */
 const deleteComment = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
+  const userId = req.user?._id
 
+  // Validate the comment ID
   if (!isValidObjectId(commentId)) {
-    throw new ApiError(400, "Invalid comment id")
+    throw new ApiError(400, "Invalid comment id");
   }
 
-  const deletedComment = await Comment.findOneAndDelete({
-    _id: commentId,
-    owner: req.user._id,
+  // Check if the logged-in user is the owner of the comment
+  const isOwner = await Comment.exists({
+    owner: userId,
+    _id: commentId
   });
 
-  if (!deletedComment) {
-    throw new ApiError(404, 'Comment not found or unauthorized');
+  if (!isOwner) {
+    throw new ApiError(403, 'Comment not found or you are not authorized to delete this comment.');
   }
 
-  // Delete all likes associated with the comment and replies
-  await Like.deleteMany({
-    comment: {
-      $in: [
-        commentId, // Deletes likes of the main comment
-        ...await Comment.find({ parentId: commentId }).distinct('_id') // Deletes likes of all replies
-      ]
+  // Check if the comment has any likes or replies
+  const [hasLikes, hasReplies] = await Promise.all([
+    Like.exists({ comment: commentId }),
+    Comment.exists({ parentId: commentId }),
+  ]);
+
+  // If no likes or replies exist, delete the comment directly (no need for transaction)
+  if (!hasReplies && !hasLikes) {
+    await Comment.findByIdAndDelete(commentId);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, 'Comment deleted successfully'));
+  }
+
+  // Start a session for transactional delete
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    // Delete likes on the main comment
+    await Like.deleteMany({ comment: commentId }).session(session);
+
+    // Find replies to this comment
+    const replies = await Comment.find({ parentId: commentId })
+      .select("_id")
+      .session(session);
+    const repliesId = replies.map(r => r._id);
+
+    // If replies exist, delete their likes and the replies themselves
+    if (replies?.length > 0) {
+      await Promise.all([
+        Comment.deleteMany({ parentId: commentId }).session(session),
+        Like.deleteMany({ comment: { $in: repliesId } }).session(session)
+      ]);
     }
-  });
 
-  // Delete all replies associated with the comment
-  await Comment.deleteMany({ parentId: commentId });
+    // Finally, delete the main comment
+    await Comment.findByIdAndDelete(commentId).session(session);
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, "Comment Deleted successfully"))
-})
+    // Commit the transaction
+    await session.commitTransaction();
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Comment and related data deleted successfully"))
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Transaction failed while deleting comment and related data:", error);
+    throw new ApiError(500, "Failed to delete comment and related data.");
+  } finally {
+    session.endSession();
+  }
+});
 
 // Fetch all comments for a video with pagination and sorting
 const getVideoComments = asyncHandler(async (req, res) => {
