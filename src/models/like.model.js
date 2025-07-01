@@ -16,7 +16,11 @@ const likeSchema = new Schema({
   tweet: {
     type: Schema.Types.ObjectId,
     ref: "Tweet"
-  }
+  },
+  tweetDeleted: Date
 }, { timestamps: true })
+
+// TTL index - expires immediately when tweetDeleted is set
+likeSchema.index({ "tweetDeleted": 1 }, { expireAfterSeconds: 0 })
 
 export const Like = mongoose.model("Like", likeSchema)

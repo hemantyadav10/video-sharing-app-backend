@@ -56,7 +56,20 @@ const updateTweet = asyncHandler(async (req, res) => {
 
 })
 
-// Delete an existing tweet
+/**
+ * Deletes a tweet and cleans up associated data
+ * 
+ * Flow:
+ * 1. Validates tweet ID format
+ * 2. Removes tweet (only if user is owner)
+ * 3. Cleans up associated likes with fallback strategy:
+ *    - Primary: Immediate deletion
+ *    - Fallback: TTL-based cleanup if immediate fails
+ * 4. Returns success regardless of like cleanup outcome
+ * 
+ * Security: Owner-only deletion enforced at database level
+ * Resilience: Tweet deletion succeeds even if like cleanup fails
+ */
 const deleteTweet = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
 
@@ -64,6 +77,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Invalid tweet id')
   }
 
+  // findOneAndDelete with owner filter prevents unauthorized deletions
   const deletedTweet = await Tweet.findOneAndDelete({
     _id: tweetId,
     owner: req.user?._id
@@ -73,12 +87,29 @@ const deleteTweet = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'No tweet found or you are not authorized to delete this tweet')
   }
 
-  // Delete all the associated likes
-  await Like.deleteMany({ tweet: tweetId })
+  // Hybrid cleanup strategy: immediate deletion with TTL fallback
+  try {
+    await Like.deleteMany({ tweet: tweetId })
+  } catch (error) {
+    console.log('Immediate like clean up failed trying TTL: ', error.message);
+
+    // TTL fallback: mark likes for automatic expiration
+    try {
+      await Like.updateMany(
+        { tweet: tweetId },
+        { tweetDeleted: new Date() }
+      );
+    } catch (ttlError) {
+      // Log for monitoring but don't fail the request - orphaned likes are acceptable
+      console.log('Both like cleanup methods failed for tweet: ', tweetId, ttlError.message);
+
+      // TODO: Add to cleanup queue for background processing or alert monitoring system
+    }
+  }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, {}, "Tweet deleted successfully"))
+    .json(new ApiResponse(200, { _id: deletedTweet?._id }, "Tweet deleted successfully"))
 
 })
 

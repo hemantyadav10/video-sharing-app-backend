@@ -2,9 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { globalErrorHandler } from './middlewares/error.middleware.js';
-
+import helmet from 'helmet';
+import morgan from 'morgan';
 
 const app = express();
+
+app.use(helmet())
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN,
@@ -24,6 +27,12 @@ app.use(express.static("public"));
 
 app.use(cookieParser());
 
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined'));
+} else {
+  app.use(morgan('dev'));
+}
 
 //routes
 
