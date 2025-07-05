@@ -4,6 +4,8 @@ import {
     deleteComment,
     fetchCommentReplies,
     getVideoComments,
+    pinComment,
+    unpinComment,
     updateComment
 } from "../controllers/comment.controller.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
@@ -25,5 +27,11 @@ router.route("/:videoId/:parentId").post(addComment)
 router.route("/c/:commentId")
     .delete(deleteComment)
     .patch(updateComment)
+
+router.route('/:commentId/:videoId/pin')
+    .patch(pinComment)
+
+router.route('/:commentId/:videoId/unpin')
+    .patch(unpinComment)
 
 export default router

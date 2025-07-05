@@ -68,7 +68,7 @@ const updateComment = asyncHandler(async (req, res) => {
       _id: commentId,
       owner: req.user._id
     },
-    { content: newComment.trim() },
+    { content: newComment.trim(), isEdited: true },
     { new: true, validateBeforeSave: false }
   )
 
@@ -238,18 +238,15 @@ const getVideoComments = asyncHandler(async (req, res) => {
         },
         repliesCount: {
           $size: "$replies"
-        }
+        },
+        effectivePinned: { $ifNull: ["$isPinned", false] }
       }
     },
     {
       $project: {
-        content: 1,
-        owner: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        likesCount: 1,
-        isLiked: 1,
-        repliesCount: 1
+        likes: 0,
+        replies: 0,
+        __v: 0
       }
     }
   ])
@@ -257,7 +254,10 @@ const getVideoComments = asyncHandler(async (req, res) => {
   const limitedComments = await Comment.aggregatePaginate(comments, {
     limit: Number(limit),
     page: Number(page),
-    sort: { "createdAt": sortBy === 'newest' ? -1 : 1 }
+    sort: {
+      "effectivePinned": -1,
+      "createdAt": sortBy === 'newest' ? -1 : 1
+    }
   })
 
   const totalCommentsCount = await Comment.countDocuments({ video: videoId });
@@ -351,10 +351,176 @@ const fetchCommentReplies = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, replies, "Replies fetched successfully"))
 })
 
+/**
+ * Pin a top-level comment on a video.
+ * Ensures only one pinned comment per video and only by the video owner.
+ */
+const pinComment = asyncHandler(async (req, res) => {
+  const { commentId, videoId } = req.params;
+  const userId = req.user?._id;
+
+  // Fetch comment and video in parallel
+  const [comment, video] = await Promise.all([
+    Comment.findById(commentId),
+    Video.findById(videoId)
+  ]);
+
+  if (!comment) {
+    throw new ApiError(404, 'Comment not found.');
+  }
+
+  if (!video) {
+    throw new ApiError(404, 'Video associated with the comment not found')
+  }
+
+  // Ensure the comment actually belongs to the provided video
+  if (!comment.video.equals(video._id)) {
+    throw new ApiError(400, 'Comment does not belong to the specified video.');
+  }
+
+  // Exit early if the comment is already pinned
+  if (comment.isPinned) {
+    throw new ApiError(400, 'Comment is already pinned.');
+  }
+
+  // Prevent pinning replies; only top-level comments are allowed
+  if (comment.parentId) {
+    throw new ApiError(400, "Cannot pin replies. Only top-level comments can be pinned.");
+  }
+
+  // Only the video owner is allowed to pin comments
+  if (!video.owner.equals(userId)) {
+    throw new ApiError(403, 'Unauthorized request');
+  }
+
+  const pinnedComment = await Comment.exists({
+    video: videoId,
+    isPinned: true,
+    _id: { $ne: commentId }
+  });
+
+  // If no other pinned comment exists, directly pin this one
+  if (!pinnedComment) {
+    const updatedComment = await Comment.findByIdAndUpdate(
+      commentId,
+      { $set: { isPinned: true } },
+      { new: true }
+    ).populate({
+      path: 'owner',
+      select: "username fullName avatar"
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedComment, 'Comment pinned successfully.'))
+  }
+
+  // If another is already pinned, unpin it atomically using a transaction
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    // Unpin any previously pinned comment on the same video, then pin the new one
+    const [_, updated] = await Promise.all([
+      Comment.findOneAndUpdate(
+        {
+          video: videoId,
+          isPinned: true,
+          _id: { $ne: commentId }
+        },
+        { $set: { isPinned: false } }
+      ).session(session),
+
+      Comment.findByIdAndUpdate(
+        commentId,
+        { $set: { isPinned: true } },
+        { new: true, session }
+      )
+    ]);
+
+    await session.commitTransaction();
+
+    // Do population *after* transaction
+    const updatedComment = await updated.populate({
+      path: 'owner',
+      select: 'username fullName avatar'
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedComment, 'Comment pinned successfully.'))
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Transaction failed while pinning comment.");
+
+    throw new ApiError(500, 'Failed to pin the comment.')
+  } finally {
+    session.endSession();
+  }
+});
+
+/**
+ * Unpins a comment from a video.
+ * Only the video owner can unpin a top-level pinned comment.
+ */
+const unpinComment = asyncHandler(async (req, res) => {
+  const { commentId, videoId } = req.params;
+  const userId = req.user?._id;
+
+  // Fetch comment and video in parallel
+  const [comment, video] = await Promise.all([
+    Comment.findById(commentId),
+    Video.findById(videoId)
+  ]);
+
+  if (!comment) {
+    throw new ApiError(404, 'Comment not found.');
+  }
+
+  if (!video) {
+    throw new ApiError(404, 'Video associated with the comment not found')
+  }
+
+  // Ensure the comment actually belongs to the provided video
+  if (!comment.video.equals(video._id)) {
+    throw new ApiError(400, 'Comment does not belong to the specified video.');
+  }
+
+  // Exit early if the comment is already unpinned
+  if (!comment.isPinned) {
+    throw new ApiError(400, 'Comment is already unpinned.');
+  }
+
+  if (comment.parentId) {
+    throw new ApiError(400, "Cannot unpin replies. Only top-level comments can be pinned or unpinned.");
+  }
+
+  // Only the video owner is allowed to pin comments
+  if (!video.owner.equals(userId)) {
+    throw new ApiError(403, 'Unauthorized request');
+  }
+
+  const updatedComment = await Comment.findByIdAndUpdate(
+    commentId,
+    { $set: { isPinned: false } },
+    { new: true }
+  ).populate({
+    path: 'owner',
+    select: "username fullName avatar"
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedComment, 'Comment unpinned successfully.'))
+})
+
 export {
   addComment,
   deleteComment,
   updateComment,
   getVideoComments,
-  fetchCommentReplies
+  fetchCommentReplies,
+  pinComment,
+  unpinComment
 }

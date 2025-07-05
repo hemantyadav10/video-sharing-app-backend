@@ -18,10 +18,20 @@ const commentSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "Comment",
     default: null
+  },
+  isPinned: {
+    type: Boolean,
+    default: false
+  },
+  isEdited: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true })
 
 
 commentSchema.plugin(mongooseAggregatePaginate)
+
+commentSchema.index({ video: 1, isPinned: 1 });
 
 export const Comment = mongoose.model("Comment", commentSchema)
