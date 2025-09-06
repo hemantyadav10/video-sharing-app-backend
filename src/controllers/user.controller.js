@@ -32,7 +32,7 @@ const generateAccessAndRefreshTokens = async (user) => {
     return { accessToken, refreshToken }
 
   } catch (error) {
-    throw new ApiError('something went wrong while generating refresh/access token:', error)
+    throw new ApiError('Failed to generate tokens:', error)
   }
 }
 
@@ -181,10 +181,22 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken;
 
   if (!incomingRefreshToken) {
-    throw new ApiError(401, "unauthorized request")
+    throw new ApiError(401, "Unauthorized request - refresh token required")
   }
 
-  const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+  // JWT verification with error handling 
+  let decodedToken;
+
+  try {
+    decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+  } catch (error) {
+    throw new ApiError(401, error.message)
+  }
+
+  // Validate decoded token payload
+  if (!decodedToken?._id) {
+    throw new ApiError(401, "Invalid token payload");
+  }
 
   const user = await User.findById(decodedToken?._id)
 
@@ -192,13 +204,15 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid refresh token: user not found")
   }
 
+  // Check if the refresh token matches the one stored in database
   if (incomingRefreshToken !== user?.refreshToken) {
     throw new ApiError(401, "Refresh token is expired or used")
   }
 
+  // Generate new tokens
   const { refreshToken, accessToken } = await generateAccessAndRefreshTokens(user);
 
-  console.log('access token refreshed')
+  console.log(`Access token refreshed for user: ${user._id}`);
 
   return res
     .status(200)
@@ -206,8 +220,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     .cookie("refreshToken", refreshToken, refreshCookieOptions)
     .json(new ApiResponse(
       200,
-      { accessToken },
-      "Access token refreshed"
+      { accessToken, refreshToken },
+      "Access token refreshed successfully"
     ))
 })
 
